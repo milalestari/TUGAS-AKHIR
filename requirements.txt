@@ -1,0 +1,9 @@
+# Requirements — Fase 0-1 (Pra-pemrosesan & Pembagian Data)
+# TensorFlow, scikit-learn, Streamlit, Kaggle API ditambahkan saat Fase 2+ (training)
+pillow
+numpy
+pandas
+matplotlib
+seaborn
+jupyter
+ipykernel
