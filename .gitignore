@@ -1,1 +1,59 @@
-.AGENT
+# Claude Code
+.claude/
+.claude_settings/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+eggs/
+*.egg
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Virtual environments (venv / conda) -- environment lokal di luar repo
+env/
+venv/
+ENV/
+.venv/
+
+# ML/DL outputs
+results/figures/phase*/
+results/figures/*.png
+results/figures/*.jpg
+!results/figures/.gitkeep
+*.h5
+*.keras
+*.ckpt
+*.ckpt.index
+*.ckpt.data-00000-of-00001
+*.pb
+saved_model/
+logs/
+tensorboard/
+wandb/
+
+# Kaggle / training artifacts
+dataset/split/           # sudah ada di local, upload manual ke Kaggle
+dataset/processed/       # sudah di-generate lokal, tidak perlu di-git
+*.csv                    # semua manifest / hasil analisis
+!requirements.csv
+
+# OS
+.DS_Store
+Thumbs.db
+*~
+
+# Misc
+*.log
+.env
+.env.local
+.idea/
+.vscode/
