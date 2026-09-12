@@ -58,3 +58,5 @@ Thumbs.db
 .env.local
 .idea/
 .vscode/
+dataset/split/dataset_cloud_split.zip
+.DS_Store
