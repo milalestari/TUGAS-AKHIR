@@ -59,4 +59,5 @@ Thumbs.db
 .idea/
 .vscode/
 dataset/split/dataset_cloud_split.zip
+dataset/split/dataset-cuaca-split.zip
 .DS_Store
