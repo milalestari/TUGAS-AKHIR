@@ -29,7 +29,7 @@ from pathlib import Path
 import numpy as np
 import tensorflow as tf
 
-from model_builder import (
+from src.model_builder import (
     build_model,
     unfreeze_for_fine_tune,
     build_callbacks,
