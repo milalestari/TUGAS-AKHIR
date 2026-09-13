@@ -9,7 +9,7 @@
 | Tujuan | Notebook training 2 arsitektur × 5 seed × 2 tahap (freeze + fine-tune), siap dijalankan di Kaggle GPU T4×2 |
 | Ref. Proposal | 3.3.6, 3.3.7, Tabel 3.3 |
 | Ref. Dokumen Utama | `doc/main-documentation.md` Bagian 4.4 |
-| Prasyarat | Fase 1 selesai; `dataset/split/` tersedia |
+| Prasyarat | Fase 1 selesai; `dataset/split/` di-upload sebagai Kaggle Dataset privat `dataset-cuaca-split` di `/kaggle/input/` |
 | Output | `src/model_builder.py`, `src/train.py`, `notebooks/03a_training_efficientnetb0.ipynb`, `notebooks/03b_training_resnet50.ipynb`, `models/` |
 | Status | Sedang Dikerjakan (12 September 2026) |
 
@@ -103,33 +103,79 @@ for epoch in range(1, 11):   # 10 epoch
 
 ## 5. Setup Kaggle Notebook
 
-### 5a. Clone dari GitHub LFS
+### 5a. Struktur Direktori di Kaggle
+
+```
+/kaggle/
+├── input/
+│   └── dataset-cuaca-split/     ← Kaggle Dataset privat (data split 5-seed)
+│       └── dataset/split/
+│           ├── seed42/{train,val,test}/{Cerah,Mendung,Hujan,Berawan,Berkabut}/
+│           ├── seed123/...
+│           ├── seed2024/...
+│           ├── seed7/...
+│           └── seed99/...
+│
+└── working/
+    └── TUGAS-AKHIR/              ← Git clone repo GitHub
+        ├── notebooks/
+        │   ├── 03a_training_efficientnetb0.ipynb
+        │   └── 03b_training_resnet50.ipynb
+        ├── src/
+        │   ├── data_pipeline.py
+        │   ├── model_builder.py
+        │   └── train.py
+        ├── models/                  ← output training (.keras)
+        └── results/                 ← output evaluasi (JSON, PNG)
+```
+
+### 5b. Clone Repo ke Kaggle Working
 
 ```bash
-# Di Kaggle Notebook → Terminal (New → Terminal)
-!apt-get install -y git-lfs > /dev/null 2>&1
-!git lfs install
-
-# Clone repo
-!git clone https://github.com/milalestari/TUGAS-AKHIR.git
-%cd TUGAS-AKHIR
+# Di Kaggle Terminal (New → Terminal)
+%cd /kaggle/working
+!git clone -b preprocessing_img https://github.com/milalestari/TUGAS-AKHIR.git
 
 # Verifikasi
-!ls dataset/split/    # harus ada 5 seed
-!ls src/              # harus ada data_pipeline.py
+!ls TUGAS-AKHIR/src/       # harus ada model_builder.py, train.py, data_pipeline.py
 ```
 
-**Catatan:** Folder `dataset/split/` ~500MB — GitHub LFS perlu dikonfigurasi untuk file besar. Jika LFS tidak aktif, gunakan Kaggle Dataset upload sebagai fallback.
+### 5c. Upload Dataset ke Kaggle
 
-### 5b. Fallback: Kaggle Dataset
+1. Buka https://www.kaggle.com → Create New Dataset
+2. Upload folder `dataset/split/` (ZIP atau langsung folder)
+3. Nama: `dataset-cuaca-split` (privat)
+4. Di notebook: notebook akan otomatis melihat `/kaggle/input/dataset-cuaca-split/`
 
-```bash
-# Upload folder dataset/split/ sebagai Kaggle Dataset privat
-# Lalu di notebook:
-!kaggle datasets download -d USERNAME/ta-cuaca-split -p dataset_split --unzip
+### 5d. Bootstrap Cell (Auto-detect Path)
+
+Setiap notebook sudah memiliki bootstrap cell di **cell pertama yang bisa dieksekusi** (cell auto-detect). Cell ini:
+
+```python
+def find_project_root():
+    current = Path.cwd()
+    for path in [current, *current.parents]:
+        if (path / "requirements.txt").exists() and (path / "src").exists():
+            return path
+    raise RuntimeError("PROJECT_ROOT TUGAS-AKHIR tidak ditemukan.")
+
+PROJECT_ROOT = find_project_root()
+os.chdir(PROJECT_ROOT)
+sys.path.insert(0, str(PROJECT_ROOT))
+
+INPUT_DIR  = Path("/kaggle/input/dataset-cuaca-split")
+if not INPUT_DIR.exists():
+    INPUT_DIR = PROJECT_ROOT / "dataset" / "split"   # fallback lokal
+
+DATA_DIR    = INPUT_DIR
+MODELS_DIR  = PROJECT_ROOT / "models"
+RESULTS_DIR = PROJECT_ROOT / "results"
 ```
 
-### 5c. Accelerator
+Notebook auto-detect `PROJECT_ROOT` — tidak perlu hard-code `/kaggle/working/TUGAS-AKHIR`.
+
+### 5e. Accelerator
+
 ```
 Notebook Settings → Accelerator → GPU T4×2
 ```
@@ -137,19 +183,21 @@ Notebook Settings → Accelerator → GPU T4×2
 ## 6. Alur Kode di Notebook
 
 ```
-Sel  1: Judul & informasi
-Sel  2: Setup (clone repo / import library)
-Sel  3: Verifikasi data_pipeline
-Sel  4: Load data dengan build_tf_dataset
-Sel  5: Build model (model_builder)
-Sel  6: STAGE 1 — Freeze + Train 10 epoch
-Sel  7: Load best checkpoint Stage 1
-Sel  8: STAGE 2 — Unfreeze + Fine-tune 10 epoch
-Sel  9: Visualisasi training history
-Sel 10: Evaluasi pada test split
-Sel 11: Classification report + Confusion matrix
-Sel 12: Simpan hasil ke results/
-Sel 13: Download checkpoint & hasil
+Sel  1: Judul & informasi (markdown)
+Sel  2: Bootstrap auto-detect (auto-detect PROJECT_ROOT + INPUT_DIR)
+Sel  3: Import library (TensorFlow, scikit-learn, dll.)
+Sel  4: Verifikasi data_pipeline & paths
+Sel  5: Load datasets dengan build_tf_dataset (seed=42 demo)
+Sel  6: Build model EfficientNetB0/ResNet50 (Stage 1: freeze)
+Sel  7: STAGE 1 — Feature Extraction (freeze, 10 epoch)
+Sel  8: Load best checkpoint Stage 1
+Sel  9: STAGE 2 — Fine-Tuning (unfreeze, 10 epoch)
+Sel 10: Visualisasi training history
+Sel 11: Evaluasi pada test set
+Sel 12: Classification report + Confusion matrix
+Sel 13: Simpan history & metrik ke JSON
+Sel 14: Full pipeline — Semua 5 seed (sequential)
+Sel 15: Summary semua metrik (5 seed)
 ```
 
 ## 7. Output & Definition of Done
@@ -213,4 +261,4 @@ Dengan T4×2 paralel (EfficientNetB0 di GPU:0, ResNet50 di GPU:1): waktu bisa di
 
 ---
 
-*Versi dokumen: 0.1 — 12 September 2026*
+*Versi dokumen: 0.2 — 12 September 2026 (Kaggle bootstrap auto-detect, setup INPUT_DIR)*
