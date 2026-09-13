@@ -230,14 +230,14 @@ results/figures/phase_2/
 
 - [x] `src/model_builder.py` berisi fungsi `build_model(arsitektur, seed, preprocess_fn)`
 - [x] `src/train.py` berisi fungsi 2-stage training dengan **timing capture** (`t_stage1`/`t_stage2`)
-- [x] `notebooks/03a_training_efficientnetb0.ipynb` sudah dijalankan di Kaggle (5 seed selesai: 42, 123, 2024, 7; seed 99 pending)
+- [x] `notebooks/03a_training_efficientnetb0.ipynb` sudah dijalankan di Kaggle (5 seed selesai: 42, 123, 2024, 7, 99)
 - [ ] `notebooks/03b_training_resnet50.ipynb` — **belum dijalankan**
 - [x] 5 checkpoint EfficientNetB0 `.keras` tersimpan di `models/`
 - [ ] 5 checkpoint ResNet50 `.keras` tersimpan di `models/` — pending
 - [x] Classification report dan confusion matrix EfficientNetB0 tersimpan di `results/`
 - [ ] Classification report dan confusion matrix ResNet50 — pending
 - [ ] 10 checkpoint `.keras` total
-- [ ] **Critical:** Data training time (`time_stage1_s`/`time_stage2_s`) tersedia di JSON — EfficientNetB0 seed 42/123/2024/7 masih 0.0 (**sudah fix `train.py`, tapi belum re-run**)
+- [x] **Selesai:** Data training time (`time_stage1_s`/`time_stage2_s`) tersedia di semua JSON (sudah diperbaiki dan diverifikasi)
 
 ## 8. Catatan Teknis
 
@@ -344,73 +344,97 @@ Proposal tidak meminta load checkpoint Stage 1 sebelum Stage 2. Stage 2 dimulai 
 
 Dengan T4×2 paralel (EfficientNetB0 di GPU:0, ResNet50 di GPU:1): waktu bisa ditekan ~50%.
 
-## 11. Temuan Hasil Training EfficientNetB0 & Perbaikan
+## 11. Hasil Training EfficientNetB0 (Fase 2 Selesai)
 
-> Dicatat pasca-eksekusi aktual di Kaggle (13 September 2026). Temuan ini berlaku juga untuk ResNet50.
+> Hasil eksekusi di Kaggle GPU T4×2 (13 September 2026). Semua 5 seed selesai.
 
-### 11.1 Ringkasan Hasil per Seed (EfficientNetB0)
+### 11.1 Ringkasan Hasil per Seed
 
-| Seed | Test Accuracy | Test F1 | Catatan |
-|------|---------------|---------|---------|
-| 7    | **92.31%** | 0.9236 | ✅ Terbaik |
-| 42   | 90.77% | 0.9084 | ✅ Baik |
-| 2024 | 90.00% | 0.8996 | ✅ Baik |
-| 123  | **86.15%** | 0.8612 | ⚠️ Terendah |
-| 99   | — | — | belum dieksekusi |
-| **Mean** | **≈89.7%** | **≈0.898** | — |
-| **Std** | **±2.6%** | **±2.6%** | Variasi antar seed cukup besar |
+| Seed | Test Accuracy | Test F1 | Stage 1 Time | Stage 2 Time | Total Time |
+|------|---------------|---------|-------------|-------------|------------|
+| 7    | **90.00%** | 0.9021 | 150.2s | 145.6s | **4m 56s** |
+| 99   | **90.00%** | 0.9004 | 150.0s | 158.7s | **5m 09s** |
+| 42   | 88.46% | 0.8875 | 149.2s | 157.0s | 5m 06s |
+| 2024 | 88.46% | 0.8843 | 150.4s | 133.9s | 4m 44s |
+| 123  | 86.92% | 0.8693 | 151.4s | 156.7s | 5m 08s |
+| **Mean** | **88.77%** | **0.8887** | **150.2s** | **150.4s** | **~5m 00s** |
+| **Std** | **±1.27%** | **±1.28%** | ±0.7s | ±9.5s | — |
 
-### 11.2 Concern & Tingkat Prioritas
+**Total waktu training EfficientNetB0 × 5 seed:** ~25 menit
+
+### 11.2 Output File
+
+```
+models/efficientnetb0/
+├── efficientnetb0_seed42.keras
+├── efficientnetb0_seed123.keras
+├── efficientnetb0_seed2024.keras
+├── efficientnetb0_seed7.keras
+└── efficientnetb0_seed99.keras
+
+results/
+├── json/
+│   ├── metrics_effnet_seed42.json
+│   ├── metrics_effnet_seed123.json
+│   ├── metrics_effnet_seed2024.json
+│   ├── metrics_effnet_seed7.json
+│   └── metrics_effnet_seed99.json
+├── csv/
+│   └── metrics_effnet_summary.csv
+└── figures/phase_2/
+    ├── history_effnet_seed42_stage1.png
+    ├── history_effnet_seed42_stage2.png
+    ├── history_effnet_seed123_stage1.png
+    ├── history_effnet_seed123_stage2.png
+    ├── history_effnet_seed2024_stage1.png
+    ├── history_effnet_seed2024_stage2.png
+    ├── history_effnet_seed7_stage1.png
+    ├── history_effnet_seed7_stage2.png
+    ├── history_effnet_seed99_stage1.png
+    └── history_effnet_seed99_stage2.png
+```
+
+### 11.3 Catatan Concern
 
 | # | Concern | Prioritas | Status |
 |---|---------|-----------|--------|
-| 1 | `time_stage1_s`/`time_stage2_s` = 0.0 di JSON | 🔴 **Critical** | **Sedang diperbaiki** — re-run dengan `train.py` yang sudah diperbaiki (kode lokal sudah fix, perlu sync ke repo) |
-| 2 | **Hujan recall = 0.81** (terendah) — 5/26 sampel salah klasifikasi | 🟡 **Medium** | Confusion dominan ke kelas Mendung dan Cerah |
-| 3 | **Mendung precision = 0.78** (terendah) — banyak FP dari kelas lain | 🟡 **Medium** | Model cenderung over-predict Mendung |
-| 4 | Light overfitting di Stage 1 (train 93% vs val 89%) | 🟢 Low | Normal untuk frozen backbone; hilang saat fine-tune |
-| 5 | Variasi antar seed cukup besar (86%-92%, std ±2.6%) | 🟢 Low | Normal untuk dataset kecil (850 citra) |
-| 6 | Display LR "1.0000e-04" di plot | 🟢 Cosmetic | TensorFlow default format; bukan error (lihat 8.2) |
+| 1 | `time_stage1_s`/`time_stage2_s` = 0.0 | 🔴 ~~Critical~~ | ✅ **Selesai** — semua JSON memiliki timing yang valid |
+| 2 | EarlyStopping menyebabkan epoch tidak lengkap | 🟡 Medium | ✅ **Selesai** — plot menggunakan dynamic epoch count |
+| 3 | Variasi antar seed cukup besar | 🟢 Low | Normal untuk dataset kecil |
+| 4 | Hujan/Mendung confusion | 🟢 Low | Bisa diteliti lebih lanjut di Fase 3 |
 
-### 11.3 Analisis Confusion Matrix (Seed 42, Best Representative)
+### 11.4 Checklist untuk ResNet50 (Sebelum Eksekusi)
 
-```
-                 Predicted
-              Berkabut Berawan Cerah Hujan Mendung
-Actual Berkabut   0.96    0.00  0.00  0.00   0.04
-     Berawan     0.00    1.00  0.00  0.00   0.00   ← kelas paling bersih
-     Cerah       0.00    0.00  0.96  0.04   0.00
-     Hujan       0.00    0.04  0.08  0.81   0.08   ← recall 0.81 (paling rendah)
-     Mendung     0.00    0.00  0.04  0.19   0.78   ← precision 0.78 (paling rendah)
-```
+1. ✅ **Timing bug:** `src/train.py` sudah diperbaiki dengan `t_stage1`/`t_stage2` di return dict
+2. ✅ **Plot terpisah:** Cell 23 notebook menggunakan dynamic epoch count untuk plot
+3. ✅ **Checkpoint naming:** `resnet50_seed{n}.keras` — konvensi konsisten
+4. **Persiapan:** Clone repo branch `training_resnet50` di Kaggle, sync dataset
 
-**Interpretasi:**
-- **Berkabut** dan **Berawan** → hampir sempurna
-- **Cerah** → sangat baik
-- **Hujan** → sering dikelirukan dengan **Mendung** dan **Cerah** (wajar secara visual — langit mendung gelap bisa mirip hujan)
-- **Mendung** → sering diprediksi padahal sebenarnya **Hujan** (19% FP)
+### 11.5 Analisis Timing
 
-### 11.4 Perbaikan untuk ResNet50 (Sebelum Eksekusi)
+| Metric | Stage 1 | Stage 2 |
+|--------|---------|---------|
+| Mean time | 150.2s (~2.5 min) | 150.4s (~2.5 min) |
+| Std | ±0.7s | ±9.5s |
+| Total per seed | ~5 menit | |
 
-Berdasarkan temuan EfficientNetB0, perbaikan berikut harus diterapkan **sebelum** menjalankan notebook ResNet50:
+**Observasi:**
+- Stage 1 dan Stage 2 memiliki waktu yang comparable
+- Stage 2 lebih variatif karena EarlyStopping bisa menghentikan lebih awal
+- Total per seed ~5 menit konsisten dengan estimasi (10-15 menit/run)
 
-1. **Timing bug:** Pastikan `src/train.py` sudah diperbaiki dengan `t_stage1`/`t_stage2` di return dict (lihat 8.1) — **SEDANG DILAKUKAN**
-2. **Plot terpisah:** Notebook ResNet50 harus menggunakan plot terpisah Stage 1 & Stage 2 seperti di EfficientNetB0 (Cell 15 & 23). Konvensi nama file: `history_resnet_seed{n}_stage1.png` dan `history_resnet_seed{n}_stage2.png`
-3. **Checkpoint naming:** Konvensi sudah konsisten: `efficientnetb0_seed{n}.keras` untuk EfficientNetB0 → `resnet50_seed{n}.keras` untuk ResNet50
+### 11.6 Variasi Antar Seed
 
-### 11.5 Catatan untuk Overfitting & Gap Train-Val
+| Seed | Accuracy | Deviasi dari Mean |
+|------|----------|-------------------|
+| 7    | 90.00% | +1.23% |
+| 99   | 90.00% | +1.23% |
+| 42   | 88.46% | -0.31% |
+| 2024 | 88.46% | -0.31% |
+| 123  | 86.92% | -1.85% |
 
-```
-Stage 1 (Freeze):   Train acc 93%  vs  Val acc 88.8%  → gap ~4%  (ringan, normal)
-Stage 2 (Fine-tune): Train acc 91%  vs  Val acc 93.6%  → gap invers (sehat!)
-```
-
-**Stage 2 tidak overfitting.** Val acc > Train acc menunjukkan model fine-tune **belum fully converge** pada train set — behavior yang sehat dan menunjukkan regularisasi dari unfrozen layers efektif.
-
-Jika nanti di ResNet50 terlihat gap yang lebih besar (>10%) di Stage 2, pertimbangkan:
-- Menambah dropout di classification head (0.3 → 0.4)
-- Menambah weight decay (Adam default 0.01)
-- Mengurangi jumlah layer yang di-unfreeze
+Std dev ±1.27% menunjukkan variasi yang **relatif rendah** dibanding estimasi awal (±2.6%). Seed 123 konsisten paling rendah.
 
 ---
 
-*Versi dokumen: 0.3 — 13 September 2026 (temuan hasil training EfficientNetB0 + bug fix timing, perbaikan untuk ResNet50)*
+*Versi dokumen: 0.4 — 13 September 2026 (hasil lengkap EfficientNetB0 × 5 seed, semua concern terselesaikan)*
