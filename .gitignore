@@ -26,7 +26,7 @@ ENV/
 .venv/
 
 # ML/DL outputs
-results/figures/phase*/
+# results/figures/phase*/
 results/figures/*.png
 results/figures/*.jpg
 !results/figures/.gitkeep
