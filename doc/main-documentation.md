@@ -92,7 +92,7 @@ Node oval (start/end) dan rectangle (proses) mengikuti konvensi umum UML Activit
 | Pengumpulan & Penggabungan Data | 3.3.3, Tabel 3.2 | `dataset/`, `notebooks/01_data_preparation.ipynb`                                                 |
 | Pra-pemrosesan Data             | 3.3.4            | `src/data_pipeline.py`, `notebooks/02_preprocessing_and_split.ipynb`                              |
 | Pembagian Data                  | 3.3.5, Tabel 3.3 | `dataset/split/seed{n}/`, `notebooks/02_preprocessing_and_split.ipynb`                            |
-| Pelatihan Model                 | 3.3.6            | `src/model_builder.py`, `src/train.py`, `notebooks/03a_training_efficientnetb0.ipynb`, `notebooks/03b_training_resnet50.ipynb`, `models/` |
+| Pelatihan Model                 | 3.3.6            | `src/model_builder.py`, `src/train.py`, `notebooks/03_*.ipynb`, `notebooks/04_*.ipynb`, `models/` |
 | Evaluasi Model                  | 3.3.7, 2.7, 2.8  | `src/evaluate.py`, `notebooks/05_evaluation_comparison.ipynb`, `results/`                         |
 | Analisis Perbandingan Performa  | 3.3.8            | `results/statistical_test/`                                                                       |
 | Implementasi Prototipe          | 3.3.9            | `app/streamlit_app.py`                                                                            |
@@ -178,8 +178,8 @@ TUGAS-AKHIR/
 ├── notebooks/
 │   ├── 01_data_preparation.ipynb
 │   ├── 02_preprocessing_and_split.ipynb
-│   ├── 03a_training_efficientnetb0.ipynb
-│   └── 03b_training_resnet50.ipynb
+│   ├── 03_train_efficientnetb0.ipynb
+│   ├── 04_train_resnet50.ipynb
 │   └── 05_evaluation_comparison.ipynb
 ├── results/
 │   ├── metrics/            # classification report, confusion matrix (csv/json)
@@ -259,21 +259,21 @@ Dokumen ini menjadi _base doc_ untuk pengerjaan bertahap bersama Claude Code. Se
 
 ### Ringkasan & Status
 
-| Fase | Nama                                     | Eksekusi                                | Status        |
-| ---- | ---------------------------------------- | --------------------------------------- | ------------- |
-| 0    | Persiapan Dataset                        | Lokal                                   | Selesai       |
-| 1    | Pipeline Pra-pemrosesan & Pembagian Data | Lokal                                   | Selesai       |
-| 2    | Arsitektur Model & Skrip Training        | Lokal (kode) + Kaggle (eksekusi manual) | Sedang Dikerjakan |
-| 3    | Evaluasi & Analisis Statistik            | Lokal                                   | Belum Mulai   |
-| 4    | Prototipe Aplikasi Streamlit             | Lokal                                   | Belum Mulai   |
-| 5    | Draf BAB IV & V                          | Lokal                                   | Belum Mulai   |
-| 6    | Finalisasi & Revisi Dosen                | Lokal                                   | Belum Mulai   |
+| Fase | Nama                                     | Eksekusi                                | Status                                                                                                                |
+| ---- | ---------------------------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| 0    | Persiapan Dataset                        | Lokal                                   | Perlu Diulang (koreksi kualitas data, 14 Sep)                                                                         |
+| 1    | Pipeline Pra-pemrosesan & Pembagian Data | Lokal                                   | Perlu Diulang (mengikuti Fase 0)                                                                                      |
+| 2    | Arsitektur Model & Skrip Training        | Lokal (kode) + Kaggle (eksekusi manual) | Sebagian Berjalan — 4/5 seed EfficientNetB0 sudah dilatih tapi jadi tidak valid & perlu diulang; ResNet50 belum mulai |
+| 3    | Evaluasi & Analisis Statistik            | Lokal                                   | Belum Mulai                                                                                                           |
+| 4    | Prototipe Aplikasi Streamlit             | Lokal                                   | Belum Mulai                                                                                                           |
+| 5    | Draf BAB IV & V                          | Lokal                                   | Belum Mulai                                                                                                           |
+| 6    | Finalisasi & Revisi Dosen                | Lokal                                   | Belum Mulai                                                                                                           |
 
 ### Fase 0 — Persiapan Dataset
 
 - **Tujuan:** dataset final 850 citra, 5 kelas Bahasa Indonesia, siap pakai
 - **Ref:** Proposal 3.3.3, Tabel 3.2; Bagian 4.1
-- **Prasyarat:** tidak ada — pemetaan folder → label pada dataset sumber sudah dipastikan benar (lihat Bagian 4.1), tinggal diterapkan
+- **Prasyarat:** tidak ada — pemetaan folder → label pada dataset sumber sudah dipastikan benar (lihat Bagian 4.1); **update 14 Sep:** ditemukan cross-class mislabeling & file duplikat di Source 1 lewat audit manual, perlu koreksi sebelum sampling — lihat `doc/phase-0-preparing_dataset.md` Bagian 8
 - **Output:** `dataset/processed/`, `notebooks/01_data_preparation.ipynb`
 - **Detail lengkap:** `doc/phase-0-preparing_dataset.md`
 
@@ -291,7 +291,7 @@ Dokumen ini menjadi _base doc_ untuk pengerjaan bertahap bersama Claude Code. Se
 - **Tujuan:** skrip/notebook training 2 arsitektur × 5 seed, siap dijalankan di Kaggle Notebook (GPU T4×2)
 - **Ref:** Proposal 3.3.6; Bagian 4.4
 - **Prasyarat:** Fase 1 selesai
-- **Output:** `src/model_builder.py`, `src/train.py`, `notebooks/03a_training_efficientnetb0.ipynb`, `notebooks/03b_training_resnet50.ipynb`
+- **Output:** `src/model_builder.py`, `src/train.py`, `notebooks/03_train_efficientnetb0.ipynb`, `notebooks/04_train_resnet50.ipynb`
 - **Eksekusi:** kode disiapkan di sini, tapi **training aktual dijalankan manual di Kaggle**; 10 checkpoint hasil (mengikuti konvensi nama di 4.4) diunduh kembali ke `models/` sebagai titik serah-terima ke Fase 3
 
 ### Fase 3 — Evaluasi & Analisis Statistik
@@ -322,4 +322,4 @@ Dokumen ini menjadi _base doc_ untuk pengerjaan bertahap bersama Claude Code. Se
 
 ---
 
-_Versi dokumen: 0.4 — 12 September 2026 (Fase 2 dimulai)_
+_Versi dokumen: 0.4 — 14 September 2026 (status Fase 0-2 diperbarui: koreksi kualitas data mengharuskan pengulangan)_

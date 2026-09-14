@@ -11,7 +11,7 @@
 | Ref. Dokumen Utama | `doc/main-documentation.md` Bagian 4.1                                         |
 | Prasyarat          | Tidak ada — pemetaan folder → label sudah dipastikan benar, tinggal diterapkan |
 | Output             | `dataset/processed/`, `notebooks/01_data_preparation.ipynb`                    |
-| Status             | Belum Mulai                                                                    |
+| Status             | Perlu Diulang — koreksi kualitas data ditemukan 14 September 2026 (lihat Bagian 8)                        |
 
 ## 1. Strategi Pengembangan: Hybrid VS Code + Kaggle
 
@@ -114,11 +114,61 @@ Notebook ini **tidak** melakukan resize/normalisasi/augmentasi — itu bagian Fa
 - [ ] `notebooks/01_data_preparation.ipynb` jalan top-to-bottom tanpa error di kernel venv `tugas_akhir`
 - [ ] Update status Fase 0 di `doc/main-documentation.md` Bagian 10 → Selesai
 
-## 7. Catatan untuk Fase Berikutnya
+## 8. Update — Koreksi Kualitas Data (Temuan Manual, 14 September 2026)
 
-- **Fase 1** (masih VS Code, venv sama) memakai `dataset/processed/` sebagai input pipeline resize/normalize/augment/split — tambah `scikit-learn` ke `requirements.txt` saat itu
-- **Sebelum Fase 2** (training di Kaggle): upload `dataset/processed/` sebagai Kaggle Dataset privat (`kaggle datasets create` atau web UI) — lihat Bagian 1
+### 8.1 Temuan
+
+Hasil pengecekan visual manual terhadap dataset sumber (bukan pengecekan otomatis — ini temuan mata langsung dari Anda) menemukan dua masalah di `dataset/raw/Source 1 (vijayvkb98)/Cloudy/`:
+
+1. **Cross-class mislabeling** — sejumlah citra di folder `Cloudy` secara visual jelas menunjukkan kondisi berkabut (visibilitas sangat terbatas karena kabut tebal), bukan berawan biasa. Dua contoh terkonfirmasi:
+   - `cloudy159.jpg` — bandara nyaris tak terlihat karena kabut tebal
+   - `cloudy54.jpg` — jalan dengan visibilitas sangat terbatas, siluet pohon karena kabut
+2. **File duplikat dengan penamaan bergaya OS** — pola `cloudy48.jpg`, `cloudy48(1).jpg`, `cloudy48(2).jpg` mengindikasikan file yang sama diunduh/disalin berulang tanpa overwrite. Berisiko **data leakage** kalau salinan yang mirip lolos sampling ke 170 yang dipakai lalu terpisah ke subset train dan test yang berbeda.
+
+Sebagai observasi tambahan (bukan masalah): kelas `Foggy` di sumber yang sama memakai 3 pola nama berbeda (`foggy-*`, `haze-*`, `mist-*`) — kemungkinan digabung dari beberapa sub-sumber oleh kurator dataset asli. Ini secara semantik wajar (haze dan mist berdekatan dengan fog) dan tidak dianggap sebagai kesalahan, berbeda dari temuan #1 di atas yang jelas salah folder.
+
+**Kemungkinan keterkaitan dengan hasil Fase 2:** confusion matrix EfficientNetB0 (seed=42) menunjukkan Berawan salah diklasifikasikan sebagai Berkabut (4%) dan Mendung (4%). Ada kemungkinan citra bermasalah di atas termasuk yang tersampel ke 170 dan berakhir di test split — jika benar, model sebenarnya "melihat" ciri kabut dengan benar, hanya label groundtruth-nya yang keliru. Perlu dicek terhadap `manifest.csv` versi lama sebagai bahan diskusi BAB IV nanti (terlepas dari apakah dataset diperbaiki atau tidak).
+
+### 8.2 Keputusan
+
+Diperbaiki sekarang (bukan didokumentasikan sebagai keterbatasan saja), karena ini titik termurah untuk redo: sebelum ResNet50 mulai dan sebelum seluruh 5 seed EfficientNetB0 selesai. Konsekuensi: `dataset/processed/` berubah → Fase 1 (`dataset/split/`) harus digenerate ulang → 4 seed EfficientNetB0 yang sudah dilatih (Fase 2) tidak valid lagi dengan dataset baru dan perlu diulang.
+
+### 8.3 Mekanisme Koreksi (Reproducible, Bukan Geser File Manual)
+
+Ditambahkan ke `notebooks/01_data_preparation.ipynb`, diterapkan **sebelum** langkah sampling `random_state=42`:
+
+**Langkah 1 — Deduplikasi otomatis.** Hash (MD5) setiap file di seluruh `Source 1 (vijayvkb98)` (bukan cuma Cloudy — sekalian cek semua kelas untuk jaga-jaga). File dengan hash identik → simpan hanya satu (yang nama filenya tanpa suffix `(n)`), sisanya masuk daftar exclude otomatis.
+
+**Langkah 2 — Contact sheet untuk audit manual.** Generate grid visual berlabel nama file untuk 170 citra `Berawan` (dan `Berkabut`) yang **sudah tersampel di run sebelumnya** — bukan re-audit 300+ citra mentah, cukup yang benar-benar terpakai. Anda review, tambahkan temuan lain (kalau ada) ke `dataset_corrections.json`.
+
+**Langkah 3 — File koreksi manual** `dataset/dataset_corrections.json` (root repo), sudah diisi 2 temuan awal sebagai starting point:
+
+```json
+{
+  "reclassify": {
+    "cloudy159.jpg": "Berkabut",
+    "cloudy54.jpg": "Berkabut"
+  },
+  "exclude": []
+}
+```
+`exclude` diisi otomatis dari hasil deduplikasi Langkah 1, digabung manual kalau Anda temukan file lain yang perlu dibuang (bukan direklasifikasi) saat review contact sheet.
+
+**Langkah 4 — Terapkan sebelum sampling.** Saat membangun pool kandidat tiap kelas dari Source 1:
+- File di `exclude` → dibuang dari pool asalnya, tidak masuk kandidat manapun
+- File di `reclassify` → dipindah dari pool kelas asal ke pool kelas tujuan
+- Sampling `random_state=42` tetap 170/kelas seperti sebelumnya, tinggal jalan dari pool yang sudah bersih
+
+Sisa pool tetap cukup besar untuk 170/kelas (Cloudy: 323 dikurangi beberapa exclude/reclassify masih ratusan; Foggy: 259 ditambah reklasifikasi baru).
+
+**Catatan reproduktibilitas:** hasil sampel 170/kelas yang baru **tidak akan identik** dengan yang lama (pool sumbernya berubah) — ini memang tujuannya (membangun ulang dari data yang sudah bersih), bukan mereproduksi sampel lama yang sudah diketahui bermasalah. Reproduktibilitas berlaku ke depan: siapa pun yang menjalankan ulang kode + `dataset_corrections.json` yang sama akan dapat 850 citra yang identik.
+
+### 8.4 Dampak ke Fase Berikutnya
+
+- **Fase 1** harus dijalankan ulang sepenuhnya begitu `dataset/processed/` baru selesai (murah, ~1 menit untuk 4.250 file per estimasi sebelumnya)
+- **Fase 2**: arsipkan (jangan hapus) 4 checkpoint + metrik EfficientNetB0 yang sudah ada (mis. pindah ke `models/_pre_correction/`, `results/_pre_correction/`) sebagai catatan historis — bisa berguna untuk membandingkan dampak koreksi data di BAB IV kalau diperlukan. Lalu retrain kelima seed dari awal dengan dataset baru.
+- **BAB III/IV**: proses koreksi data ini justru memperkuat narasi metodologi — bisa ditulis sebagai langkah quality control tambahan di luar spesifikasi awal proposal, menunjukkan kehati-hatian terhadap kualitas dataset crowd-sourced.
 
 ---
 
-_Versi dokumen: 0.1 — 9 September 2026_
+_Versi dokumen: 0.2 — 14 September 2026 (Bagian 8: koreksi kualitas data — mislabeling & duplikasi Source 1)_

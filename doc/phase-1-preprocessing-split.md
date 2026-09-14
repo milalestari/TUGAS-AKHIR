@@ -11,7 +11,7 @@
 | Ref. Dokumen Utama | `doc/main-documentation.md` Bagian 4.2–4.3 |
 | Prasyarat | Fase 0 selesai |
 | Output | `dataset/split/seed{42,123,2024,7,99}/{train,val,test}/{kelas}/`, `src/data_pipeline.py`, `notebooks/02_preprocessing_and_split.ipynb` |
-| Status | Selesai (11 September 2026 — bug flat-folder, floating-point precision round()/int(), dan syntax parentheses sudah diperbaiki & didokumentasikan) |
+| Status | Perlu Diulang — `dataset/processed/` akan berubah karena koreksi kualitas data di Fase 0 (lihat `phase-0-preparing_dataset.md` Bagian 8). Pipeline & bug fix di bawah tetap valid, hanya perlu dijalankan ulang di data yang sudah bersih |
 
 ## 1. Keputusan Desain
 
@@ -106,10 +106,22 @@ Menggunakan `round()` untuk train dan `int()` untuk val — TIDAK symmetric roun
 ### Bug: Syntax Error — Missing Closing Parentheses
 Formula `n = (len(list(glob(...))))` membutuhkan 4 penutup `)` di akhir (1 untuk `n=`, 3 untuk `len/list/glob`). **Sudah diperbaiki** dengan helper function `count_files()` di cell 8 untuk menghindari parenthesis hell.
 
+### Bug: Denormalisasi Visualisasi — EfficientNetB0 (`preprocess_input` = fungsi identitas)
+**Masalah:** sel demo augmentasi (`augmentasi_demo.png`) memakai `(x+1)/2` untuk menampilkan gambar, mengasumsikan `tf.keras.applications.efficientnet.preprocess_input` menyekalakan piksel ke [-1,1]. Padahal fungsi ini **fungsi identitas** (tidak melakukan apa-apa — dikonfirmasi dari dokumentasi resmi TF; EfficientNet menaruh layer Rescaling/Normalization di dalam model itu sendiri). Piksel tetap di rentang mentah [0,255], sehingga `(v+1)/2` untuk hampir semua piksel ≥1 → `.clip(0,1)` memutihkan hampir seluruh gambar. **Sudah diperbaiki:** ganti ke `img.numpy().squeeze() / 255.0`. Ini murni bug visualisasi — `build_tf_dataset()` di `data_pipeline.py` sendiri tidak salah dan tidak perlu diubah, karena EfficientNetB0 memang didesain menerima piksel mentah [0,255].
+
+### Bug: Denormalisasi Visualisasi — ResNet50 (mode "caffe": BGR + mean skala mentah)
+**Masalah:** sel demo (`resnet50_preprocess_sample.png`) awalnya memakai asumsi mode "torch" (mean=[0.485,0.456,0.406] skala 0–1). Padahal `resnet50.preprocess_input` pakai mode **"caffe"**: tukar RGB→BGR, lalu kurangi mean per-channel **skala piksel mentah 0–255** `[103.939, 116.779, 123.68]` (BGR order), tanpa pembagian/scaling apa pun (dikonfirmasi dari kode sumber Keras). **Sudah diperbaiki:**
+```python
+mean_bgr = np.array([103.939, 116.779, 123.68])
+img_bgr = img_r50.numpy().squeeze().copy() + mean_bgr   # kembalikan mean (BGR, skala 0-255)
+img_rgb = img_bgr[..., ::-1]                             # BGR -> RGB
+img_disp = (img_rgb / 255.0).clip(0, 1)
+```
+
 ## 7. Catatan untuk Fase Berikutnya
 
 - **Sebelum Fase 2:** seluruh `dataset/split/` (semua 5 seed sekaligus) diupload **satu kali** sebagai satu Kaggle Dataset privat — supaya kedua notebook training (EfficientNetB0, ResNet50) mengakses seed yang sama dari satu sumber, tanpa upload ulang per seed
 - **Fase 2** memanggil `build_tf_dataset` dari `src/data_pipeline.py` dengan `preprocess_fn` berbeda per arsitektur — modul ini perlu ikut disalin/diimpor ke lingkungan Kaggle Notebook (via upload sebagai dataset tambahan, atau di-paste langsung ke sel notebook)
 
 ---
-*Versi dokumen: 0.3 — 11 September 2026 (bug floating-point round/int + syntax parentheses)*
+*Versi dokumen: 0.4 — 14 September 2026 (2 bug denormalisasi visualisasi EfficientNet/ResNet50; status → Perlu Diulang karena koreksi data Fase 0)*
