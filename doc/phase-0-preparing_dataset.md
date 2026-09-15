@@ -172,3 +172,35 @@ Sisa pool tetap cukup besar untuk 170/kelas (Cloudy: 323 dikurangi beberapa excl
 ---
 
 _Versi dokumen: 0.2 — 14 September 2026 (Bagian 8: koreksi kualitas data — mislabeling & duplikasi Source 1)_
+
+### 8.5 Update — Audit Visual & Revisi Keputusan (15 September 2026)
+
+Setelah dataset_corrections.json diterapkan, dilakukan audit visual contact sheet:
+
+**File contact sheet yang dihasil:**
+- `results/figures/audit_berawan.png` — 170 citra Berawan tersampel (dari Source 1 Cloudy)
+- `results/figures/audit_berkabut.png` — 170 citra Berkabut tersampel (dari Source 1 Fog)
+
+**Temuan tambahan dari audit:**
+
+| Kelas 1 | Kelas 2 | Jenis | Contoh |
+|----------|---------|-------|--------|
+| Berawan | Mendung | Tone gelap | cloudy195, cloudy181, cloudy55, cloudy50, cloudy82, cloudy282 — awan terlihat gelap seperti mendung |
+| Berawan | Berkabut | Tekstur kabut | cloudy159, cloudy54 — sudah dipindahkan ke Berkabut |
+| Berkabut | Snow | Klasifikasi batas | mist-013.jpg — terlihat seperti bersalju, namun dalam toleransi |
+
+**Revisi Keputusan (vs Section 8.3 awal):**
+
+Berdasarkan review lebih lanjut, CLAHE untuk Berawan-Mendung di-pending:
+
+| Solusi | Scope | Status |
+|--------|-------|--------|
+| **Label correction** (`dataset_corrections.json`) | Berawan → Mendung | Prioritas 1 — perluas json dengan 6 file baru |
+| **CLAHE ablation** | Berkabut saja | Prioritas 2 — eksperimen terkontrol, bukan preprocessing wajib |
+| **Dokumentasi keterbatasan** | Confusion matrix | BAB IV — ambiguitas semantik yang genuinely tidak bisa diputuskan |
+
+Detail keputusan dan argumen ada di `doc/phase-1-preprocessing-split.md` Bagian 8.4-8.6.
+
+---
+
+_Versi dokumen: 0.4 — 15 September 2026 (Bagian 8.5: revisi keputusan CLAHE vs label correction)_

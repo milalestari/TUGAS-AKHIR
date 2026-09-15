@@ -42,8 +42,8 @@ tensorboard/
 wandb/
 
 # Kaggle / training artifacts
-dataset/split/           # sudah ada di local, upload manual ke Kaggle
-dataset/processed/       # sudah di-generate lokal, tidak perlu di-git
+# dataset/split/           # sudah ada di local, upload manual ke Kaggle
+# dataset/processed/       # sudah di-generate lokal, tidak perlu di-git
 *.csv                    # semua manifest / hasil analisis
 !requirements.csv
 

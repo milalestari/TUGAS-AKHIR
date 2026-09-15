@@ -125,3 +125,150 @@ img_disp = (img_rgb / 255.0).clip(0, 1)
 
 ---
 *Versi dokumen: 0.4 — 14 September 2026 (2 bug denormalisasi visualisasi EfficientNet/ResNet50; status → Perlu Diulang karena koreksi data Fase 0)*
+
+## 8. Update — Audit Kualitas Data & Usulan CLAHE (15 September 2026)
+
+### 8.1 Audit Visual Contact Sheet
+
+Hasil review contact sheet setelah koreksi kualitas data (dataset_corrections.json diterapkan):
+
+**Contact sheet yang dihasil:**
+- `results/figures/audit_berawan.png` — 170 citra Berawan tersampel (dari Source 1 Cloudy)
+- `results/figures/audit_berkabut.png` — 170 citra Berkabut tersampel (dari Source 1 Fog)
+
+**Temuan ambiguitas kelas:**
+
+| Kelas 1 | Kelas 2 | Jenis | Contoh |
+|----------|---------|-------|--------|
+| Berawan | Mendung | Tone gelap | cloudy195, cloudy181, cloudy55, cloudy50, cloudy82, cloudy282 — awan terlihat gelap seperti mendung |
+| Berawan | Berkabut | Tekstur kabut | cloudy159, cloudy54 — sebelumnya sudah teridentifikasi, dipindah ke Berkabut |
+| Berkabut | Snow | Klasifikasi batas | mist-013.jpg — terlihat seperti bersalju, namun masih dalam toleransi karena ciri utama kabut (jarak pandang terbatas) tetap terlihat |
+
+**Catatan keputusan:**
+- Tidak seluruh 850 citra ditelusuri satu per satu — ini adalah **human-in-the-loop audit**, bukan exhaustive labeling
+- Keputusan untuk tidak menelusuri semua citra sudah tepat karena: "kalau itu yang dilakukan, human yang melatih model, bukan machine learning"
+
+### 8.2 Diagnosis: Preprocessing, Bukan Hyperparameter
+
+**Analisis:**
+
+| Pendekatan | Kapan Tepat | Kondisi Kita |
+|------------|-------------|-------------|
+| **Hyperparameter tuning** | Model underfitting, learning rate/epochs kurang | Accuracy sudah 88-90% — model sudah belajar cukup |
+| **Preprocessing** | Input images memiliki karakteristik visual yang bikin model bingung | ✅ Ini kasusnya |
+
+**Mengapa preprocessing (bukan hyperparameter):**
+- Accuracy 88-90% menunjukkan model sudah mampu belajar — bukan masalah kapasitas model
+- Confusion antara Berawan↔Mendung dan Berkabut↔Snow adalah masalah **karakteristik input**, bukan output model
+- Menambah epoch atau ubah learning rate tidak mengajarkan model bahwa "awan gelap = mendung, awan terang = berawan"
+
+### 8.3 Usulan: CLAHE (Contrast Limited Adaptive Histogram Equalization)
+
+**Apa itu CLAHE:**
+- Teknis preprocessing untuk meningkatkan **local contrast** di gambar dengan pencahayaan tidak merata
+- Dirancang untuk: gambar kabut, under-exposure, awan gelap
+- Bekerja di level **pixel lokal**, bukan global — mempertahankan struktur, hanya memperkuat detail
+
+**Mengapa CLAHE tepat:**
+
+```
+Kondisi Awal                          CLAHE Applied
+────────────────────────────────      ──────────────────────────────
+Berkabut (kabut tebal)                Kabut tipis, kontur pohon/gedung terlihat
+Awan gelap (mendung)                 Awan terpisah, tidak "menggumpal" dengan kabut
+Awan terang (berawan)                 Tekstur awan lebih tajam, beda dari mendung
+```
+
+**CLAHE membantu model membedakan:**
+- Berawan vs Mendung → tekstur dan brightness relatif (CLAHE memperkuat edge awan)
+- Berkabut vs Snow → visibility pattern (CLAHE membuat kabut lebih "terbaca" sebagai kabut, bukan salju)
+
+### 8.4 Revisi Keputusan: CLAHE vs Label Correction
+
+**Klarifikasi berdasarkan review lebih lanjut:**
+
+#### Mengapa CLAHE untuk Berawan-Mendung Di-Pending
+
+CLAHE meregangkan kontras lokal — tidak bisa mengarang detail yang tidak ada di gambar. Pertanyaan kritis:
+
+> Apakah cloudy195, 181, 55, 50, 82, 282 itu **berawan yang under-exposed** (bisa dibantu CLAHE) atau **secara genuine ambigu** antara "banyak awan gelap" dan "mendung ringan" (tidak bisa helped preprocessing apa pun)?
+
+Dari deskripsi "awan terlihat gelap seperti mendung" — ini terdengar seperti kasus kedua: **ambiguitas semantik**, bukan cacat gambar. Cuaca "berawan tebal" dan "mendung ringan" itu kontinum, bukan kategori dengan batas fisik yang tegas.
+
+**Risiko tambahan:**
+- CLAHE bisa memperkuat tekstur di dalam awan gelap, membuat foto Mendung makin terlihat "bertekstur seperti Berawan" — berlawanan arah dari yang diinginkan.
+
+#### Mengapa CLAHE Lebih Masuk akal untuk Berkabut
+
+Fog/haze SECARA OPTIK memang kasus kontras-lokal-rendah (cahaya tersebar merata, detail jauh hilang) — ini persis masalah yang CLAHE didesain untuk atasi. Ada literatur mapan soal CLAHE untuk dehazing.
+
+#### Keputusan Final
+
+| Solusi | Scope | Status |
+|--------|-------|--------|
+| **Label correction** (`dataset_corrections.json`) | Berawan → Mendung | Prioritas 1 — perluas json dengan 6 file baru |
+| **CLAHE ablation** | Berkabut saja | Prioritas 2 — eksperimen terkontrol, bukan preprocessing wajib |
+| **Dokumentasi keterbatasan** | Confusion matrix | BAB IV — ambiguitas semantik yang genuinely tidak bisa diputuskan |
+
+### 8.5 Rencana Implementasi Final
+
+#### A. Label Correction untuk Berawan-Mendung (Prioritas 1)
+
+Perluas `dataset/dataset_corrections.json` dengan 6 file tambahan:
+
+```json
+{
+  "reclassify": {
+    "cloudy159.jpg": "Berkabut",
+    "cloudy54.jpg": "Berkabut",
+    "cloudy195.jpg": "Mendung",
+    "cloudy181.jpg": "Mendung",
+    "cloudy55.jpg": "Mendung",
+    "cloudy50.jpg": "Mendung",
+    "cloudy82.jpg": "Mendung",
+    "cloudy282.jpg": "Mendung"
+  },
+  "exclude": [/* 101 file duplikat */]
+}
+```
+
+Ini konsisten dengan mekanisme yang sudah dibangun untuk cloudy159/54. Perubahan cuma 6 label, risikonya jelas.
+
+#### B. CLAHE Ablation untuk Berkabut (Prioritas 2)
+
+Jika tetap ingin mencoba CLAHE, jalankan sebagai **ablation study terpisah**:
+
+```
+Eksperimen A: Train tanpa CLAHE (baseline)
+Eksperimen B: Train dengan CLAHE (hanya kelas Berkabut)
+→ Bandingkan confusion matrix Berkabut
+```
+
+**Scope dibatasi:**
+- CLAHE diterapkan HANYA saat training dengan kelas Berkabut
+- Tidak dataset-wide
+- Dibandingkan dengan baseline sebelum decide masuk pipeline
+
+**Risiko distribution shift** (untuk ablation, bukan pipeline):
+- EfficientNetB0/ResNet50 pretrained di ImageNet yang gambarnya natural, bukan CLAHE-enhanced
+- Ini risk, makanya perlu ablation test dulu sebelum jadi preprocessing wajib
+
+#### C. Dokumentasi Keterbatasan (BAB IV)
+
+Untuk sisa ambiguitas yang genuinely tidak bisa diputuskan (bukan wrong label):
+
+> Sebagian confusion matrix mencerminkan tumpang-tindih definisi kategori cuaca di dunia nyata, bukan kelemahan model. Batas antara "berawan tebal" dan "mendung ringan" adalah kontinum, bukan garis tegas.
+
+### 8.6 Catatan Penting
+
+1. **Prioritas:** Label correction dulu (murah, konsisten), CLAHE ablation nanti (jika masih ingin dicoba)
+
+2. **Jangan percaya "efek samping positif"** ke kelas lain tanpa bukti — ini asumsi, bukan temuan. ablation test diperlukan.
+
+3. **Deviasi metodologi dari proposal 3.3.4:** CLAHE langkah baru yang tidak ada di situ. Perlu didiskusikan dengan pembimbing sebelum implementasi, khususnya karena concern preprocessing dari Pak Rasudin.
+
+4. **Simpan hasil lama:** Jika CLAHE atau label correction diterapkan, simpan hasil training sebelumnya untuk perbandingan di BAB IV.
+
+---
+
+*Versi dokumen: 0.6 — 15 September 2026 (revisi CLAHE: label correction prioritas 1, CLAHE ablation untuk Berkabut saja)*

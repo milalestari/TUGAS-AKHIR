@@ -438,3 +438,38 @@ Std dev ±1.27% menunjukkan variasi yang **relatif rendah** dibanding estimasi a
 ---
 
 *Versi dokumen: 0.4 — 13 September 2026 (hasil lengkap EfficientNetB0 × 5 seed, semua concern terselesaikan)*
+
+## 12. Update — Revisi Preprocessing (15 September 2026)
+
+Berdasarkan audit kualitas data dan review lebih lanjut:
+
+### 12.1 Status Koreksi Data
+
+| Item | Status |
+|------|--------|
+| Deduplikasi MD5 (101 file) | Selesai — `dataset_corrections.json` |
+| Reclassify cloudy159, cloudy54 → Berkabut | Selesai |
+| Reclassify 6 file Berawan → Mendung | Pending — perlu konfirmasi |
+| CLAHE preprocessing | Pending — ablation study untuk Berkabut saja |
+
+### 12.2 Keputusan Final
+
+**Prioritas 1: Label Correction**
+- Perluas `dataset_corrections.json` dengan 6 file Berawan → Mendung
+- Ini murni mengubah label, tidak menyentuh pipeline training
+- Perubahan kecil, risikonya jelas
+
+**Prioritas 2: CLAHE Ablation (Bukan Preprocessing Wajib)**
+- CLAHE untuk Berkabut masuk akal secara optik (fog = kontras-lokal-rendah)
+- CLAHE untuk Berawan-Mendung di-pending karena ambiguitas semantik
+- Jika dicoba: scope HANYA ke kelas Berkabut, bandingkan dengan baseline
+- Risiko distribution shift dari pretrained ImageNet perlu dicek
+
+**Prioritas 3: Dokumentasi BAB IV**
+- Sisa confusion matrix yang genuinely ambiguous (bukan wrong label) didokumentasikan sebagai keterbatasan metodologi
+
+Detail keputusan dan argumen ada di `doc/phase-1-preprocessing-split.md` Bagian 8.4-8.6.
+
+---
+
+*Versi dokumen: 0.5 — 15 September 2026 (sinkronisasi keputusan CLAHE vs label correction dari phase-1)*
