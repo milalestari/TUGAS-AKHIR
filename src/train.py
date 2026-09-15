@@ -23,12 +23,13 @@ Usage:
 """
 
 import os
+import time as time_module
 from pathlib import Path
 
 import numpy as np
 import tensorflow as tf
 
-from model_builder import (
+from src.model_builder import (
     build_model,
     unfreeze_for_fine_tune,
     build_callbacks,
@@ -101,6 +102,7 @@ def train_two_stage(
     )
 
     print()
+    t_s1_start = time_module.time()
     history_stage1 = model.fit(
         ds_train,
         validation_data=ds_val,
@@ -108,6 +110,7 @@ def train_two_stage(
         callbacks=callbacks_s1,
         verbose=verbose,
     )
+    t_stage1 = time_module.time() - t_s1_start
 
     # Muat best weights Stage 1
     model.load_weights(stage1_checkpoint)
@@ -135,6 +138,7 @@ def train_two_stage(
     )
 
     print()
+    t_s2_start = time_module.time()
     history_stage2 = model.fit(
         ds_train,
         validation_data=ds_val,
@@ -142,6 +146,7 @@ def train_two_stage(
         callbacks=callbacks_s2,
         verbose=verbose,
     )
+    t_stage2 = time_module.time() - t_s2_start
 
     # Muat best weights Stage 2 (yang final)
     model.load_weights(checkpoint_path)
@@ -158,6 +163,8 @@ def train_two_stage(
         "model": model,
         "stage1_checkpoint": stage1_checkpoint,
         "final_checkpoint": checkpoint_path,
+        "t_stage1": t_stage1,   # training time Stage 1 dalam detik
+        "t_stage2": t_stage2,   # training time Stage 2 dalam detik
     }
 
 

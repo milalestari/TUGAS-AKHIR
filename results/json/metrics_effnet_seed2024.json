@@ -1,0 +1,10 @@
+{
+  "architecture": "efficientnetb0",
+  "seed": 2024,
+  "test_accuracy": 0.8846153846153846,
+  "test_f1": 0.8843011625998514,
+  "epochs_stage1": 10,
+  "epochs_stage2": 10,
+  "time_stage1_s": 150.35093641281128,
+  "time_stage2_s": 133.94063091278076
+}
